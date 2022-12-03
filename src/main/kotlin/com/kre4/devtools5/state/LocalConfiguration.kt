@@ -11,7 +11,7 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 )
 object LocalConfiguration: PersistentStateComponent<LocalConfiguration> {
 
-    var ratio: Float = 0.0f
+    var ratio: Float = 0.5f
     var isFileRowsMode = true
     var isFileCharsMode = false
     var isSelectedTextMode = false
@@ -22,10 +22,6 @@ object LocalConfiguration: PersistentStateComponent<LocalConfiguration> {
     }
 
     override fun loadState(state: LocalConfiguration) {
-        XmlSerializerUtil.copyBean(state, this);
-//        this.ratio = state.ratio
-//        this.isFileRowsMode = state.isFileRowsMode
-//        this.isFileCharsMode = state.isFileCharsMode
-//        this.isProjectFilesMode = state.isProjectFilesMode
+        XmlSerializerUtil.copyBean(state, this)
     }
 }
