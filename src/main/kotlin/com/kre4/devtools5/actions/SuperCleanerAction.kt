@@ -9,17 +9,22 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.kre4.devtools5.state.LocalConfiguration
+import java.lang.AssertionError
 
 /**
  * Activation via shift+ctrl+alt+DELETE
  */
 class SuperCleanerAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
-        val editor: Editor = e.getRequiredData(CommonDataKeys.EDITOR)
+        val editor: Editor?
+        try {
+            editor = e.getRequiredData(CommonDataKeys.EDITOR_EVEN_IF_INACTIVE)
+        } catch (exception: AssertionError) {
+            return
+        }
+
         val project: Project = e.getRequiredData(CommonDataKeys.PROJECT)
-        val caret = editor.getCaretModel().getPrimaryCaret();
-        val start= primaryCaret.getSelectionStart()
-        val end = primaryCaret.getSelectionEnd()
+
         var originText: String =
             if (LocalConfiguration.isSelectedTextMode)
                 editor.selectionModel.selectedText?:""
@@ -29,8 +34,7 @@ class SuperCleanerAction : AnAction() {
         if (ratio > 1.0f || ratio < 0f) {
             Messages.showMessageDialog(
                 project, "Ratio should be more than 0 and less then 1.0", "Incorrect input",
-                Messages.getInformationIcon()
-            );
+                Messages.getErrorIcon())
             return
         }
         if (LocalConfiguration.isFileRowsMode)
@@ -38,12 +42,12 @@ class SuperCleanerAction : AnAction() {
         if (LocalConfiguration.isFileCharsMode)
             originText = randomFileCharsSelection(originText, ratio)
 
-        this.performTextChange(project, editor.document, originText, LocalConfiguration.undoAvailable)
+        this.performTextChange(project, editor, originText, LocalConfiguration.undoAvailable)
 
         Messages.showMessageDialog(
-            project, "your file has been murdered :(", "Sorry",
+            project, "Your file has been murdered :(", "Sorry",
             Messages.getInformationIcon()
-        );
+        )
 
     }
 
@@ -51,11 +55,8 @@ class SuperCleanerAction : AnAction() {
      * @param ratio percent of elements that will be deleted
      */
     private fun randomFileRowsSelection(fileContent: String, ratio: Float): String {
-        if (ratio > 1.0f) {
-            return fileContent
-        }
         val codeRows = fileContent.split(Regex("\n"))
-        val randomRange = (codeRows.indices).shuffled().take((codeRows.size * ratio).toInt()).sorted()
+        val randomRange = (codeRows.indices).shuffled().take((codeRows.size * (1f - ratio)).toInt()).sorted()
         val output = StringBuilder()
         for (i in randomRange) {
             output.append(codeRows[i]).append("\n")
@@ -63,26 +64,38 @@ class SuperCleanerAction : AnAction() {
         return output.toString()
     }
 
+    /**
+     * @param ratio percent of elements that will be deleted
+     */
     private fun randomFileCharsSelection(fileContent: String, ratio: Float): String {
-        val randomRange = (fileContent.indices).shuffled().take((fileContent.length * ratio).toInt()).sorted()
+        val randomRange = (fileContent.indices).shuffled().take((fileContent.length * (1f - ratio)).toInt()).sorted()
         val output = StringBuilder()
         for (i in randomRange) {
-            output.append(fileContent[i]).append("\n")
+            output.append(fileContent[i])
         }
         return output.toString()
     }
 
 
     private fun performTextChange(
-        project: Project, document: Document,
-        newText: CharSequence, withUndo: Boolean
-    ) {
+        project: Project, editor: Editor,
+        newText: CharSequence, withUndo: Boolean) {
         if (withUndo)
-            WriteCommandAction.runWriteCommandAction(project, Runnable {
-                document.setText(newText)
-                // document.replaceString(start, end, "editor_basics")
-            })
+            WriteCommandAction.runWriteCommandAction(project) {
+                editText(editor, newText)
+            }
         else
-            document.setText(newText)
+            editText(editor, newText)
+    }
+
+    private fun editText(editor: Editor, newText: CharSequence) {
+        if (LocalConfiguration.isSelectedTextMode) {
+            val caret = editor.caretModel.primaryCaret
+            val start= caret.selectionStart
+            val end = caret.selectionEnd
+            editor.document.replaceString(start, end, newText)
+        } else {
+            editor.document.setText(newText)
+        }
     }
 }
